@@ -1,0 +1,91 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Automação simples com Lambda e S3 via CloudFormation",
+  "Resources": {
+    "MyS3Bucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": "lambda-s3-automation-12345"
+      }
+    },
+    "LambdaExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": ["lambda.amazonaws.com"]
+              },
+              "Action": ["sts:AssumeRole"]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "LambdaS3Policy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:ListBucket"
+                  ],
+                  "Resource": [
+                    { "Fn::Sub": "arn:aws:s3:::lambda-s3-automation-12345" },
+                    { "Fn::Sub": "arn:aws:s3:::lambda-s3-automation-12345/*" }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "MyLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": "ProcessS3Events",
+        "Handler": "index.handler",
+        "Role": { "Fn::GetAtt": ["LambdaExecutionRole", "Arn"] },
+        "Runtime": "python3.11",
+        "Code": {
+          "ZipFile": "import json\n\ndef handler(event, context):\n    print('Evento recebido:', json.dumps(event))\n    return {'statusCode': 200, 'body': 'Sucesso'}"
+        },
+        "Events": {
+          "S3Trigger": {
+            "Type": "S3",
+            "Properties": {
+              "Bucket": { "Ref": "MyS3Bucket" },
+              "Events": ["s3:ObjectCreated:*"]
+            }
+          }
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "LambdaFunctionName": {
+      "Description": "Nome da função Lambda",
+      "Value": { "Ref": "MyLambdaFunction" }
+    },
+    "S3BucketName": {
+      "Description": "Nome do bucket S3",
+      "Value": { "Ref": "MyS3Bucket" }
+    }
+  }
+}
